@@ -1,10 +1,16 @@
 from typing import List, Dict, Any, Union, Optional
+from langchain_core.runnables import RunnableConfig
+import json 
+import re
 
 
-def get_player_profile(name: str) -> str:
+def get_player_profile(config: RunnableConfig ,name: str ) -> str:
     '''Retrieves the full profile, stats, and match history for a specific player.
     Useful when the user asks about a specific person.'''
-    player_cursor = collection1.find({'name': {'$regex': f'^{re.escape(name)}$', '$options': 'i'}})
+
+    collection = config["configurable"]["collection"]
+
+    player_cursor = collection.find({'name': {'$regex': f'^{re.escape(name)}$', '$options': 'i'}})
     output = []
     for res in player_cursor:
         del res['_id']
@@ -12,6 +18,7 @@ def get_player_profile(name: str) -> str:
     return json.dumps(output, default=str) if output else 'No player with that name is found in the database'
 
 def search_for_attributes_in_players(
+    config: RunnableConfig,
     country: str = None,
     gender: str = None,
     racket_sponsor: str = None,
@@ -22,6 +29,10 @@ def search_for_attributes_in_players(
     Searches for players matching specific criteria.
     All arguments are optional.
     '''
+
+    collection = config["configurable"]["collection"]
+
+
     query = {}
     if country is not None:
         query['country'] = {'$regex': f'^{re.escape(country)}$', '$options': 'i'}
@@ -44,10 +55,11 @@ def search_for_attributes_in_players(
         "status": 1,
         "plays": 1
     }
-    response = list(collection1.find(query, projection))
+    response = list(collection.find(query, projection))
     return json.dumps(response , default=str) if response else 'No player with the criteria was found in the database'
 
 def sort_players_list(
+    config: RunnableConfig,
     sort_by: str,
     order: int = 1,
     country: Optional[str] = None,
@@ -61,6 +73,10 @@ def sort_players_list(
         country: Optional filter by country.
         gender: Optional filter by gender.
     """
+
+    collection = config["configurable"]["collection"]
+
+
     query = {}
     if country is not None:
         query["country"] =  {'$regex': f'^{re.escape(country)}$', '$options': 'i'}
@@ -70,6 +86,6 @@ def sort_players_list(
     # Also project the sort field if it's nested (like stats.matches_won)
     if sort_by and sort_by not in projection:
         projection[sort_by.split(".")[0]] = 1
-    cursor = collection1.find(query, projection).sort(sort_by, order)
+    cursor = collection.find(query, projection).sort(sort_by, order)
     results = list(cursor)
     return json.dumps(results, default=str) if results else "No players found matching the criteria."
