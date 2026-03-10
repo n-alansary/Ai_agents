@@ -2,7 +2,16 @@ from typing import List, Dict, Any, Union, Optional
 from langchain_core.runnables import RunnableConfig
 import json 
 import re
+from enum import StrEnum
 
+
+class RacketSponsorEnum(StrEnum):
+    DUNLOP = "Dunlop"
+    TECNIFIBRE = "Tecnifibre"
+    HEAD = "Head"
+    UNSQUASHABLE = "Unsquashable"
+    VICTOR = "Victor"
+    PRINCE = "Prince"
 
 def get_player_profile(config: RunnableConfig ,name: str ) -> str:
     '''Retrieves the full profile, stats, and match history for a specific player.
@@ -21,7 +30,7 @@ def search_for_attributes_in_players(
     config: RunnableConfig,
     country: str = None,
     gender: str = None,
-    racket_sponsor: str = None,
+    racket_sponsor: RacketSponsorEnum = None,
     status: str = None,
     plays: str = None
 ) -> str:
