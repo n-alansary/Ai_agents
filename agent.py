@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from langchain.agents import create_agent
 from pymongo.mongo_client import MongoClient
+from langgraph.checkpoint.memory import InMemorySaver
 
 from agent_tools.tools import get_player_profile , search_for_attributes_in_players , sort_players_list
 
@@ -39,8 +40,10 @@ if __name__ == "__main__":
     db = client['Sports']
     collection = db['squash']
 
+    checkpointer = InMemorySaver()
+
     agent = create_agent('groq:openai/gpt-oss-120b' , tools=[get_player_profile , search_for_attributes_in_players , sort_players_list] ,
-                         system_prompt=SYSTEM_PROMPT)
+                         system_prompt=SYSTEM_PROMPT , checkpointer=checkpointer)
 
     while(True):
       print(80*'*')
@@ -48,7 +51,7 @@ if __name__ == "__main__":
   
       # Run a test inference
       res = agent.invoke({"messages": [{"role": "user", "content": user_question}]} , 
-                                        config={"configurable": {"collection": collection}})
+                                        config={"configurable": {"collection": collection , "thread_id": "1"}})
 
       print(res['messages'][-1].content)
       
