@@ -21,29 +21,23 @@ MONGO_URI = os.getenv('MONGO_URI')
 if not MONGO_URI:
     raise RuntimeError("MONGO_URI not found in environment")
 
-# =============================================================================
-# Connecting to a database
-# =============================================================================
-# Create a new client and connect to the server
-
-
-
-
-
 
 # =============================================================================
 # Creating the ai agent
 # =============================================================================
 
+client = MongoClient(MONGO_URI)
+db = client['Sports']
+collection = db['squash']
+
+checkpointer = InMemorySaver()
+
+agent = create_agent('groq:openai/gpt-oss-120b' , tools=[get_player_profile , search_for_attributes_in_players , sort_players_list] ,
+                     system_prompt=SYSTEM_PROMPT , checkpointer=checkpointer)
+
+
 if __name__ == "__main__":
-    client = MongoClient(MONGO_URI)
-    db = client['Sports']
-    collection = db['squash']
 
-    checkpointer = InMemorySaver()
-
-    agent = create_agent('groq:openai/gpt-oss-120b' , tools=[get_player_profile , search_for_attributes_in_players , sort_players_list] ,
-                         system_prompt=SYSTEM_PROMPT , checkpointer=checkpointer)
 
     while(True):
       print(80*'*')
