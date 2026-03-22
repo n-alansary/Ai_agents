@@ -6,8 +6,10 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from agent_tools.tools import get_player_profile , search_for_attributes_in_players , sort_players_list
 
-from prompts.llm_system_prompt import SYSTEM_PROMPT
+from agent_tools.tools import execute_mongo_query , execute_mongo_crud
 
+from prompts.llm_system_prompt import SYSTEM_PROMPT ,SYSTEM_PROMPT_2 , SYSTEM_PROMPT_3
+from agent_middleware.guardrails import delete_guard
 
 # Load environment variables
 load_dotenv()
@@ -32,8 +34,8 @@ collection = db['squash']
 
 checkpointer = InMemorySaver()
 
-agent = create_agent('groq:openai/gpt-oss-120b' , tools=[get_player_profile , search_for_attributes_in_players , sort_players_list] ,
-                     system_prompt=SYSTEM_PROMPT , checkpointer=checkpointer)
+agent = create_agent('groq:openai/gpt-oss-120b' , tools=[execute_mongo_crud] ,
+                     system_prompt=SYSTEM_PROMPT_3 , checkpointer=checkpointer, middleware=[delete_guard])
 
 
 if __name__ == "__main__":
