@@ -16,8 +16,8 @@ class ChatResponse(BaseModel):
 
 
 @app.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest):
-    res = agent.invoke(
+async def chat(request: ChatRequest):
+    res = await agent.ainvoke(
         {"messages": [{"role": "user", "content": request.message}]},
         config={"configurable": {"collection": collection, "thread_id": request.thread_id}},
     )
