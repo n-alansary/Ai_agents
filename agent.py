@@ -1,7 +1,8 @@
 import os
 from dotenv import load_dotenv
 from langchain.agents import create_agent
-from pymongo.mongo_client import MongoClient
+import asyncio
+from pymongo import AsyncMongoClient
 from langgraph.checkpoint.memory import InMemorySaver
 
 from agent_tools.tools import get_player_profile , search_for_attributes_in_players , sort_players_list
@@ -28,7 +29,7 @@ if not MONGO_URI:
 # Creating the ai agent
 # =============================================================================
 
-client = MongoClient(MONGO_URI)
+client = AsyncMongoClient(MONGO_URI)
 db = client['Sports']
 collection = db['squash']
 
@@ -40,16 +41,16 @@ agent = create_agent('groq:openai/gpt-oss-120b' , tools=[execute_mongo_crud] ,
 
 if __name__ == "__main__":
 
-
-    while(True):
-      print(80*'*')
-      user_question = input('Please enter your question \n')
-  
-      # Run a test inference
-      res = agent.invoke({"messages": [{"role": "user", "content": user_question}]} , 
-                                        config={"configurable": {"collection": collection , "thread_id": "1"}})
-
-      print(res['messages'][-1].content)
+    async def main():
+        while(True):
+          print(80*'*')
+          user_question = input('Please enter your question \n')
       
-      
+          # Run a test inference
+          res = await agent.ainvoke({"messages": [{"role": "user", "content": user_question}]} , 
+                                            config={"configurable": {"collection": collection , "thread_id": "1"}})
+    
+          print(res['messages'][-1].content)
+          
+    asyncio.run(main())
 
