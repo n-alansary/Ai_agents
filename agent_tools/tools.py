@@ -13,7 +13,7 @@ class RacketSponsorEnum(StrEnum):
     VICTOR = "Victor"
     PRINCE = "Prince"
 
-def get_player_profile(config: RunnableConfig ,name: str ) -> str:
+async def get_player_profile(config: RunnableConfig ,name: str ) -> str:
     '''Retrieves the full profile, stats, and match history for a specific player.
     Useful when the user asks about a specific person.'''
 
@@ -21,12 +21,12 @@ def get_player_profile(config: RunnableConfig ,name: str ) -> str:
 
     player_cursor = collection.find({'name': {'$regex': f'^{re.escape(name)}$', '$options': 'i'}})
     output = []
-    for res in player_cursor:
+    for res in await player_cursor.to_list(length=None):
         del res['_id']
         output.append(res)
     return json.dumps(output, default=str) if output else 'No player with that name is found in the database'
 
-def search_for_attributes_in_players(
+async def search_for_attributes_in_players(
     config: RunnableConfig,
     country: str = None,
     gender: str = None,
@@ -64,10 +64,10 @@ def search_for_attributes_in_players(
         "status": 1,
         "plays": 1
     }
-    response = list(collection.find(query, projection))
+    response = await collection.find(query, projection).to_list(length=None)
     return json.dumps(response , default=str) if response else 'No player with the criteria was found in the database'
 
-def sort_players_list(
+async def sort_players_list(
     config: RunnableConfig,
     sort_by: str,
     order: int = 1,
@@ -96,14 +96,14 @@ def sort_players_list(
     if sort_by and sort_by not in projection:
         projection[sort_by.split(".")[0]] = 1
     cursor = collection.find(query, projection).sort(sort_by, order)
-    results = list(cursor)
+    results = await cursor.to_list(length=None)
     return json.dumps(results, default=str) if results else "No players found matching the criteria."
 
 
 '--------------------------------------------------------------------------------'
 
 
-def execute_mongo_query(
+async def execute_mongo_query(
     config: RunnableConfig,
     query: Dict[str, Any],
     projection: Optional[Dict[str, Any]] = None,
@@ -134,14 +134,14 @@ def execute_mongo_query(
     if limit > 0:
         cursor = cursor.limit(limit)
 
-    results = list(cursor)
+    results = await cursor.to_list(length=None)
     return json.dumps(results, default=str) if results else "No results found for the given query."
 
 
 '--------------------------------------------------------------------------------'
 
 
-def execute_mongo_crud(
+async def execute_mongo_crud(
     config: RunnableConfig,
     operation: str,
     filter: Optional[Dict[str, Any]] = None,
@@ -191,60 +191,60 @@ def execute_mongo_crud(
                 cursor = cursor.sort(sort)
             if limit > 0:
                 cursor = cursor.limit(limit)
-            results = list(cursor)
+            results = await cursor.to_list(length=None)
             return json.dumps(results, default=str) if results else "No documents found."
 
         # --- CREATE ---
         elif operation == "insert_one":
             if data is None:
                 return "Error: 'data' is required for insert_one. Provide a document dict."
-            result = collection.insert_one(data)
+            result = await collection.insert_one(data)
             return json.dumps({"inserted_id": str(result.inserted_id)})
 
         elif operation == "insert_many":
             if data is None or not isinstance(data, list):
                 return "Error: 'data' must be a list of documents for insert_many."
-            result = collection.insert_many(data)
+            result = await collection.insert_many(data)
             return json.dumps({"inserted_ids": [str(id) for id in result.inserted_ids]})
 
         # --- UPDATE ---
         elif operation == "update_one":
             if filter is None or data is None:
                 return "Error: both 'filter' and 'data' (update expression) are required for update_one."
-            result = collection.update_one(filter, data)
+            result = await collection.update_one(filter, data)
             return json.dumps({"matched_count": result.matched_count, "modified_count": result.modified_count})
 
         elif operation == "update_many":
             if filter is None or data is None:
                 return "Error: both 'filter' and 'data' (update expression) are required for update_many."
-            result = collection.update_many(filter, data)
+            result = await collection.update_many(filter, data)
             return json.dumps({"matched_count": result.matched_count, "modified_count": result.modified_count})
 
         # --- DELETE ---
         elif operation == "delete_one":
             if filter is None:
                 return "Error: 'filter' is required for delete_one."
-            result = collection.delete_one(filter)
+            result = await collection.delete_one(filter)
             return json.dumps({"deleted_count": result.deleted_count})
 
         elif operation == "delete_many":
             if filter is None:
                 return "Error: 'filter' is required for delete_many."
-            result = collection.delete_many(filter)
+            result = await collection.delete_many(filter)
             return json.dumps({"deleted_count": result.deleted_count})
 
         # --- COUNT ---
         elif operation == "count_documents":
             if filter is None:
                 filter = {}
-            count = collection.count_documents(filter)
+            count = await collection.count_documents(filter)
             return json.dumps({"count": count})
 
         # --- AGGREGATE ---
         elif operation == "aggregate":
             if pipeline is None or not isinstance(pipeline, list):
                 return "Error: 'pipeline' must be a list of aggregation stages for aggregate."
-            results = list(collection.aggregate(pipeline))
+            results = await collection.aggregate(pipeline).to_list(length=None)
             for doc in results:
                 if "_id" in doc:
                     doc["_id"] = str(doc["_id"])
