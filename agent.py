@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 from langchain.agents import create_agent
 import asyncio
 from pymongo import AsyncMongoClient
+from beanie import init_beanie
+from models.player import Player
 from langgraph.checkpoint.memory import InMemorySaver
 
 from agent_tools.tools import get_player_profile , search_for_attributes_in_players , sort_players_list
@@ -42,6 +44,9 @@ agent = create_agent('groq:openai/gpt-oss-120b' , tools=[execute_mongo_crud] ,
 if __name__ == "__main__":
 
     async def main():
+        # Initialize Beanie
+        await init_beanie(database=db, document_models=[Player])
+
         while(True):
           print(80*'*')
           user_question = input('Please enter your question \n')

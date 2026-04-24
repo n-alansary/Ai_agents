@@ -3,6 +3,7 @@ from langchain_core.runnables import RunnableConfig
 import json 
 import re
 from enum import StrEnum
+from models.player import Player
 
 
 class RacketSponsorEnum(StrEnum):
@@ -17,7 +18,7 @@ async def get_player_profile(config: RunnableConfig ,name: str ) -> str:
     '''Retrieves the full profile, stats, and match history for a specific player.
     Useful when the user asks about a specific person.'''
 
-    collection = config["configurable"]["collection"]
+    collection = Player.get_pymongo_collection()
 
     player_cursor = collection.find({'name': {'$regex': f'^{re.escape(name)}$', '$options': 'i'}})
     output = []
@@ -39,7 +40,7 @@ async def search_for_attributes_in_players(
     All arguments are optional.
     '''
 
-    collection = config["configurable"]["collection"]
+    collection = Player.get_pymongo_collection()
 
 
     query = {}
@@ -83,7 +84,7 @@ async def sort_players_list(
         gender: Optional filter by gender.
     """
 
-    collection = config["configurable"]["collection"]
+    collection = Player.get_pymongo_collection()
 
 
     query = {}
@@ -121,7 +122,7 @@ async def execute_mongo_query(
               Direction: 1 for ascending, -1 for descending.
         limit: Maximum number of documents to return. 0 means no limit.
     """
-    collection = config["configurable"]["collection"]
+    collection = Player.get_pymongo_collection()
 
     if projection is None:
         projection = {"_id": 0}
@@ -176,7 +177,7 @@ async def execute_mongo_crud(
         pipeline: An aggregation pipeline list for the "aggregate" operation
                   (e.g. [{"$group": {"_id": "$country", "count": {"$sum": 1}}}]).
     """
-    collection = config["configurable"]["collection"]
+    collection = Player.get_pymongo_collection()
     operation = operation.lower().strip()
 
     try:
@@ -198,27 +199,66 @@ async def execute_mongo_crud(
         elif operation == "insert_one":
             if data is None:
                 return "Error: 'data' is required for insert_one. Provide a document dict."
-            result = await collection.insert_one(data)
-            return json.dumps({"inserted_id": str(result.inserted_id)})
+            try:
+                validated_data = Player(**data).model_dump(by_alias=True , exclude_none=True)
+                result = await collection.insert_one(validated_data)
+                return json.dumps({"inserted_id": str(result.inserted_id)})
+            except Exception as e:
+                return f"Validation Error on insert_one: {str(e)}"
 
         elif operation == "insert_many":
             if data is None or not isinstance(data, list):
                 return "Error: 'data' must be a list of documents for insert_many."
-            result = await collection.insert_many(data)
-            return json.dumps({"inserted_ids": [str(id) for id in result.inserted_ids]})
+            try:
+                validated_data = [Player(**d).model_dump(by_alias=True , exclude_none=True) for d in data]
+                result = await collection.insert_many(validated_data)
+                return json.dumps({"inserted_ids": [str(id) for id in result.inserted_ids]})
+            except Exception as e:
+                return f"Validation Error on insert_many: {str(e)}"
 
         # --- UPDATE ---
         elif operation == "update_one":
             if filter is None or data is None:
                 return "Error: both 'filter' and 'data' (update expression) are required for update_one."
-            result = await collection.update_one(filter, data)
-            return json.dumps({"matched_count": result.matched_count, "modified_count": result.modified_count})
+            try:
+                doc = await Player.find_one(filter)
+                if not doc:
+                    return json.dumps({"matched_count": 0, "modified_count": 0})
+                
+                update_fields = data.get("$set", data)
+                for key, value in update_fields.items():
+                    if "." in key:
+                         return f"Validation Error: Object-level updates do not support dot-notation keys like '{key}'. Please update the full parent object instead."
+                    if not hasattr(doc, key):
+                         return f"Validation Error: Field '{key}' does not exist in the Player schema."
+                    setattr(doc, key, value)
+                
+                await doc.save()
+                return json.dumps({"matched_count": 1, "modified_count": 1})
+            except Exception as e:
+                return f"Validation Error on update_one: {str(e)}"
 
         elif operation == "update_many":
             if filter is None or data is None:
                 return "Error: both 'filter' and 'data' (update expression) are required for update_many."
-            result = await collection.update_many(filter, data)
-            return json.dumps({"matched_count": result.matched_count, "modified_count": result.modified_count})
+            try:
+                docs = await Player.find(filter).to_list()
+                if not docs:
+                    return json.dumps({"matched_count": 0, "modified_count": 0})
+                
+                update_fields = data.get("$set", data)
+                for doc in docs:
+                    for key, value in update_fields.items():
+                        if "." in key:
+                             return f"Validation Error: Object-level updates do not support dot-notation keys like '{key}'."
+                        if not hasattr(doc, key):
+                             return f"Validation Error: Field '{key}' does not exist in the Player schema."
+                        setattr(doc, key, value)
+                    await doc.save()
+                
+                return json.dumps({"matched_count": len(docs), "modified_count": len(docs)})
+            except Exception as e:
+                return f"Validation Error on update_many: {str(e)}"
 
         # --- DELETE ---
         elif operation == "delete_one":
