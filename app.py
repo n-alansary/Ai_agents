@@ -1,27 +1,15 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from pydantic import BaseModel
-from agent import agent, collection
+from routes.chat import router as chat_router
+from utils.db import init_db
 
-app = FastAPI(title="Squash Agent API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize the database connection on app startup
+    await init_db()
+    yield
 
+app = FastAPI(title="Squash Agent API", lifespan=lifespan)
 
-class ChatRequest(BaseModel):
-    message: str
-    thread_id: str = "default"
+app.include_router(chat_router)
 
-
-class ChatResponse(BaseModel):
-    response: str
-    thread_id: str
-
-
-@app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    res = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": request.message}]},
-        config={"configurable": {"collection": collection, "thread_id": request.thread_id}},
-    )
-    return ChatResponse(
-        response=res["messages"][-1].content,
-        thread_id=request.thread_id,
-    )
